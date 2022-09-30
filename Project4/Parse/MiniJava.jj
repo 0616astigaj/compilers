@@ -1,0 +1,298 @@
+PARSER_BEGIN(MiniJava)
+    package Parse;
+    public class MiniJava{}
+PARSER_END(MiniJava)
+
+/* WHITE SPACE */
+SKIP: 
+{   " " 
+    | "\t" 
+    | "\n" 
+    | "\r" 
+    | "\f"
+    | <"//" (~["\n","\r"])* ("\n"|"\r")>
+    }
+TOKEN: 
+{
+    /* PROTECTED */
+    "class"
+    | "public" 
+    | "static" 
+    | "void" 
+    | "main" 
+    | "String" 
+    | "extends"
+    | "Thread"
+    | "synchronized"
+    | "return"
+    | "boolean"
+    | "int"
+    | "if"
+    | "else"
+    | "while"
+    | "Xinu"
+    | "new"
+    | "true"
+    | "false"
+    | "this"
+    | "null"
+    
+    /* PUNCTUATION */
+    | "{" 
+    | "}" 
+    | "(" 
+    | ")" 
+    | "[" 
+    | "]"
+    | ","
+    | ";"
+    | "."
+
+    /* OPERATORS */
+    | "||"
+    | "&&"
+    | "=="
+    | "<"
+    | ">"
+    | "+"
+    | "-"
+    | "*"
+    | "/"
+    
+    /* LITERALS */
+
+    | < NUM: ( ["1"-"9"] (["0"-"9"])* | "0" ) >
+
+    /* IDENTIFIERS */
+
+    | < ID: <LETTER> (<LETTER>|<DIGIT>|<UNDER>)* >
+    | < #LETTER: ["A"-"Z","a"-"z"] >
+    | < #DIGIT: ["0"-"9"] >
+    | < #UNDER: "_" >
+}
+
+void Goal():
+{}
+{
+    MainClassDeclaration() ( LOOKAHEAD(4) ThreadDeclaration() | ClassDeclaration() )* <EOF>
+}
+
+void MainClassDeclaration():
+{}
+{
+    "class" <ID> "{" "public" "static" "void" "main" "(" "String" "[" "]" <ID> ")" "{" ( LOOKAHEAD(2) VarDeclaration() )* ( Statement() )* "}" "}"
+}
+
+void ClassDeclaration():
+{}
+{
+    "class" <ID> ( "extends" <ID> )? "{" ( FieldDeclaration() | MethodDeclaration() )* "}"
+}
+
+void ThreadDeclaration():
+{}
+{
+    "class" <ID> "extends" "Thread" "{" ( FieldDeclaration() | LOOKAHEAD(3) MethodDeclaration() | VoidDeclaration() )* "}"
+}
+
+void VarDeclaration():
+{}
+{
+    Type() <ID> ( "=" Expression() )? ";"
+}
+
+void MethodDeclaration():
+{}
+{
+    "public" ( "synchronized" )? Type() <ID> "(" ( Type() <ID> ( "," Type() <ID> )* )? ")" "{" ( LOOKAHEAD(2) VarDeclaration() )* ( Statement() )* "return" Expression() ";" "}"
+}
+
+void VoidDeclaration():
+{}
+{
+    "public" "void" <ID> "(" ")" "{" ( LOOKAHEAD(2) VarDeclaration() )* ( Statement() )* "}"
+}
+
+void FieldDeclaration():
+{}
+{
+    Type() <ID> ";"
+}
+
+void Type():
+{} 
+{
+    "boolean" ("[" "]")*
+    | "int" ("[" "]")*
+    | <ID> ("[" "]")*
+}
+
+void Statement():
+{}
+{
+    "{" ( Statement() )* "}"
+    | "if" "(" Expression() ")" Statement() ( LOOKAHEAD(2) "else" Statement() )?
+    | "while" "(" Expression() ")" Statement()
+    | "Xinu" "." <ID> "(" ( Expression() ( "," Expression() )* )? ")" ";"
+    | Brackets() "=" Expression() ";"
+}
+
+void Expression():
+{}
+{
+    Logical_Or()
+}
+
+void Logical_Or():
+{}
+{
+    Logical_And() [Logical_Or2()]
+}
+
+void Logical_Or2():
+{}
+{
+    "||" Logical_Or()
+}
+
+void Logical_And():
+{}
+{
+    Equality() [Logical_And2()]
+}
+
+void Logical_And2():
+{}
+{
+    "&&" Logical_And()
+}
+
+void Equality():
+{}
+{
+    Relational() [Equality2()]
+}
+
+void Equality2():
+{}
+{
+    "==" Equality()
+}
+
+void Relational():
+{}
+{
+    Additive() [Relational2()]
+}
+
+void Relational2():
+{}
+{
+    ">" Relational()
+    | "<" Relational()
+}
+
+void Additive():
+{}
+{
+    Multiplicative() [Additive2()]
+}
+
+void Additive2(): 
+{}
+{
+    "+" Additive()
+    | "-" Additive()
+}
+
+void Multiplicative():
+{}
+{
+    Unary() [Multiplicative2()]
+}
+
+void Multiplicative2():
+{}
+{
+    "*" Multiplicative()
+    | "/" Multiplicative()
+}
+
+void Unary(): 
+{}
+{
+    "-" Parens()
+    | "!" Parens()
+    | Parens()
+}
+
+void Parens():
+{}
+{
+    "(" Expression() ")" 
+    | Method()
+}
+
+void Method(): 
+{}
+{
+    Brackets() [LOOKAHEAD(3) Method2()] 
+}
+
+void Method2():
+{}
+{
+    "." <ID> "(" ( Expression() ( "," Expression() )* )? ")" [Method()]
+    | "Xinu" "." <ID> "(" (Expression() ("," Expression())* )? ")" [Method()]
+}
+
+void Brackets():
+{}
+{
+    Dot() [Brackets2()]
+}
+
+void Brackets2():
+{}
+{
+    "[" Expression() "]" Brackets()
+}
+
+void Dot():
+{}
+{
+    Term() [LOOKAHEAD(2) Dot2()]
+}
+
+void Dot2():
+{}
+{
+    "." <ID> Dot()
+}
+
+void Term():
+{}
+{
+    
+    // | LOOKAHEAD(3) "new" Type() "[" Expression() "]" ("[" "]")*
+    // | 
+    "new" Type() "(" ")"
+    | <ID>
+    | <NUM>
+    //| <STRING>
+    | "true"
+    | "false"
+    | "this"
+    | "null"
+}
+
+
+
+
+
+
+
+
+
+
+
